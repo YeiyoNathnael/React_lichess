@@ -84,6 +84,12 @@ export async function fetchUserGames(
   
   // Build query parameters
   const params: Record<string, string> = {};
+  
+  // Set default format to JSON if not specified
+  if (options.pgnInJson === undefined) {
+    options.pgnInJson = true;
+  }
+  
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined) {
       params[key] = String(value);
@@ -101,9 +107,51 @@ export async function fetchUserGames(
       throw new Error(`Lichess API error: ${response.status}`);
     }
     
-    // Games API returns NDJSON, so we need to parse it line by line
-    const text = await response.text();
-    return text.trim().split('\n').map(line => JSON.parse(line));
+    const contentType = response.headers.get('content-type');
+    
+    // Handle different response formats
+    if (contentType?.includes('application/x-ndjson')) {
+      // NDJSON format - parse line by line
+      const text = await response.text();
+      const games = [];
+      
+      for (const line of text.trim().split('\n')) {
+        if (line.trim()) {
+          try {
+            games.push(JSON.parse(line));
+          } catch (e) {
+            console.warn('Failed to parse game JSON:', e);
+          }
+        }
+      }
+      
+      return games;
+    } else if (contentType?.includes('application/json')) {
+      // Standard JSON format
+      return await response.json();
+    } else if (contentType?.includes('application/x-chess-pgn')) {
+      // PGN format - return as text with type indication
+      const pgn = await response.text();
+      return {
+        format: 'pgn',
+        pgn: pgn,
+        games: pgn.split(/\n\n\[/).map(game => 
+          game.startsWith('[') ? game : `[${game}`
+        )
+      };
+    } else {
+      // Default fallback - try to parse as JSON but be prepared for failure
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        // If JSON parsing fails, return the raw text
+        return {
+          format: 'unknown',
+          raw: text
+        };
+      }
+    }
   } catch (error) {
     console.error('Error fetching user games:', error);
     return null;

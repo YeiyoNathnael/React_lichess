@@ -1,6 +1,6 @@
-// @ts-ignore
+
 import { NextResponse } from 'next/server';
-// @ts-ignore
+
 import { cookies } from 'next/headers';
 import { createVerifier, createChallenge } from './pkce';
 import { getConfig, getBaseUrl } from '../config';

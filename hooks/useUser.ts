@@ -78,7 +78,7 @@ export function useUser() {
  */
 export function useUserGames(
   username?: string, 
-  options = { max: 10, ongoing: true, finished: true }
+  options = { max: 10, ongoing: true, finished: true, pgnInJson: true }
 ) {
   const { isAuthenticated } = useAuth();
   const [games, setGames] = useState<any[]>([]);
@@ -86,15 +86,53 @@ export function useUserGames(
   const [error, setError] = useState<Error | null>(null);
 
   const fetchGames = useCallback(async () => {
-    if (!isAuthenticated) return;
-    
+    if (!isAuthenticated) {
+      setGames([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       
       const gamesData = await fetchUserGames(username, options);
-      setGames(gamesData || []);
       
+      if (!gamesData) {
+        setGames([]);
+        throw new Error('Failed to fetch games');
+      }
+      
+      // Handle different response formats
+      if (Array.isArray(gamesData)) {
+        // Regular array of games
+        setGames(gamesData);
+      } else if (gamesData.format === 'pgn') {
+        // PGN format - for display purposes, create basic game objects
+        const simplifiedGames = gamesData.games.map((pgn: { match: (arg0: RegExp) => string[]; }, index: any) => {
+          // Extract basic info from PGN using regex
+          const event = pgn.match(/\[Event "([^"]+)"/)?.[1] || 'Game';
+          const white = pgn.match(/\[White "([^"]+)"/)?.[1] || 'Unknown';
+          const black = pgn.match(/\[Black "([^"]+)"/)?.[1] || 'Unknown';
+          const date = pgn.match(/\[Date "([^"]+)"/)?.[1] || 'Unknown date';
+          
+          return {
+            id: `pgn-${index}`,
+            white: { name: white },
+            black: { name: black },
+            createdAt: date,
+            status: 'finished',
+            pgn: pgn,
+            event: event
+          };
+        });
+        
+        setGames(simplifiedGames);
+      } else {
+        // Unknown format
+        setGames([]);
+        throw new Error('Unsupported games data format');
+      }
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -103,15 +141,8 @@ export function useUserGames(
   }, [isAuthenticated, username, options]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchGames();
-    }
-  }, [isAuthenticated, fetchGames]);
+    fetchGames();
+  }, [fetchGames]);
 
-  return {
-    games,
-    loading,
-    error,
-    refresh: fetchGames
-  };
+  return { games, loading, error, refresh: fetchGames };
 }

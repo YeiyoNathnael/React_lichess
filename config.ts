@@ -3,9 +3,9 @@ import { LichessConfig } from './types';
 // Helper to safely access process.env
 const getEnv = (key: string): string | undefined => {
   // Check if process is defined before accessing env
-  // @ts-ignore
+  // 
   if (typeof process !== 'undefined' && process.env) {
-    // @ts-ignore
+    // 
     return process.env[key];
   }
   return undefined;

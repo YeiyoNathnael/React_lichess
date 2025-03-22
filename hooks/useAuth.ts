@@ -1,6 +1,6 @@
-//@ts-ignore
+"use client"
 import { useState, useEffect, useCallback } from 'react';
-import { getSession, isAuthenticated as checkAuth } from '../auth/session';
+import { is_Authenticated, getSession, loginWithLichess, logout as logoutUser } from '../auth/client';
 import { LichessSession } from '../types';
 
 /**
@@ -20,7 +20,8 @@ export function useAuth() {
       setLoading(true);
       setError(null);
       
-      const authenticated = await checkAuth();
+      // Fixed function name to match what's in client.ts
+      const authenticated = await is_Authenticated();
       setIsAuthenticated(authenticated);
       
       if (authenticated) {
@@ -46,15 +47,21 @@ export function useAuth() {
    * Redirects to Lichess login page
    */
   const login = useCallback(() => {
-    window.location.href = '/api/auth/lichess/login';
+    loginWithLichess();
   }, []);
 
   /**
    * Logs out the current user
    */
-  const logout = useCallback(() => {
-    window.location.href = '/api/auth/lichess/logout';
-  }, []);
+  const logout = useCallback(async () => {
+    try {
+      await logoutUser();
+      // Refresh auth state after logout
+      await checkAuthentication();
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, [checkAuthentication]);
 
   return {
     isAuthenticated,

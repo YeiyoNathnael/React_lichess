@@ -12,3 +12,4 @@ export * from './useTeams';
 export * from './useStudies';
 export * from './useFide';
 export * from './useBroadcasts';
+export { useAuth } from './useAuth';
